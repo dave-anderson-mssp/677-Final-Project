@@ -1,0 +1,128 @@
+---
+title: "Final"
+author: "Dave Anderson"
+date: "April 28, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = FALSE,warning = FALSE)
+library(tidyverse)
+library(pwr)
+library(effsize)
+library(wPerm)
+library(corrplot)
+library(gridExtra)
+library(fitdistrplus)
+```
+
+#1
+  The following includes paired t-tests between the minority and white customers, as well as one to test between high income minority and white customers. The null hypothesis is $H_0: \mu_1 = \mu_2$ with the alternative being that minorities have a higher rejection rate than white customers, $H_1: \mu_1 > \mu_2$.
+  The tests both show evidence to reject the null hypothesis and support the claim that minorities have a higher rate of rejection at both class levels than whites.
+  I also performed a permutation test for difference in means between the two groups. Using various numbers of resampling from the dataset, we still uptained extremely small p-values, suggesting that there is a difference in the means of the two groups.
+  It is easy to look at the data and see that minorities have a generally higher rate of rejection from the banks. On the other hand, any statistician would be hesitant to draw conclusions from this data. There are only 20 banks, and we have no information about the number of customers in each group. 
+```{r}
+acorn <- read_csv("acorn.csv")
+acorn <- acorn %>% mutate(difference = MIN - WHITE,high_diff = HIMIN - HIWHITE)
+
+#t.test(acorn$difference, mu = 0)
+t.test(acorn$MIN,acorn$WHITE,paired = TRUE, alternative = "greater")
+t.test(acorn$HIMIN,acorn$HIWHITE,paired = TRUE, alternative = "greater")
+
+
+
+effect1 <- cohen.d(acorn$MIN,acorn$WHITE)
+
+pwr.t.test(n = 20,d = effect1$estimate,sig.level = .05,type = "paired")
+
+perm <- perm.paired.loc(acorn$MIN,acorn$WHITE,mean,alternative = "greater")
+perm$p.value
+```
+#2
+  At first glance, the schools appear to produce different quality ornithopters. I started by scaling the cells to the proportion of each schools totals. For example, 71% of Area 51's ornithopters are of "flying" quality. The proportions of quality for each school actually start to look similar.
+  I decided to begin statistical testing with a chi-square test on the two-way table. The test produced a p-value of .86, so we don't have enough evidence to suggest that one school is larger in a certain category than another. In other words, the row and column variables are independent. If we plot the correlation of residuals, we can see that Giffen school tends to have more "dead" ornithopeters compared to their expected. Area 51 has more display and BDV has more flying. Based on our chi-square results, this is likely due to chance.  
+```{r}
+ornithopters <- data.frame("Dead" = c(12,8,21), "Display" = c(23,12,30),"Flying" = c(89,62,119))
+
+rownames(ornithopters) <- c("Area 51","BDV","Giffen")
+
+prop <- data.frame("Dead" = c(12/124,8/82,21/170), "Display" = c(23/124,12/82,30/170), "Flying" = c(89/124,62/82,119/170))
+
+
+chisq <- chisq.test(ornithopters)
+#chisq$p.value
+corrplot(chisq$residuals, is.corr = FALSE)
+
+
+```
+  I also ran a test on the proportions of flying ornithopeters between the three schools. As you can see below, we again have a large p-value, indicating there isn't suffience evidence to claim one school makes more flying ornithopeters than the other schools. 
+```{r}
+prop.test(c(89,62,119),c(124,82,170))
+```
+  
+
+#3
+```{r}
+shark <- read_csv("sharkattack.csv")
+usa <- shark %>% filter(`Country code` == 'US')
+australia <- shark %>% filter(`Country code` == 'AU')
+
+usa_fatal <- usa %>% group_by(Fatal) %>% summarise(n = n())
+
+australia_fatal <- australia %>% group_by(Fatal) %>% summarise(n = n())
+
+
+death <- matrix(c(318,217,879,1795),ncol = 2)
+colnames(death) <- c("Survived","Died") 
+rownames(death) <- c("Australia","US")
+  
+prop.test(death)
+
+h <- ES.h(0.2656642,0.1078529)
+pwr.2p2n.test(h = h,n1 = 318+879,n2 = 1795+217,sig.level = .05)
+
+```
+  There are definitely more attacks in the United States, but we have no information about total beachgoers/surfers. I would assume there are more people active in the ocean in the united states than in Australia. Australia does have more coastline (US: 19,924 km, AU:
+25,760 km), but the United States has a much larger population (US: 326,625,791, AU: 23,232,413). Interestingly, the estimated number of surfers for both countries is about 2.5 million. 
+  In terms of aggression and power of sharks, fatalities is most likely our best measure. Testing the proportions of fatalities in each country, we see that about 27% of Australian attacks are fatal, while only 11% of United States attacks are. The p-value of this proportion test shows there is evidence to suggest that Australian attacks are deadlier than American ones. With an alpha of .05, a power test suggests 100% power, indicating the probability of the two countries having different proportions and us failing to reject it is near 0. I believe there is strong evidence to suggest that sharks in Australia are deadlier.  
+  
+  
+#4
+  When testing the difference in proportions, it is tempting to subtract the two and use the difference as an "effect size". As stated in the problem, this causes issues as two equal differences can have different levels of power associated with them. 
+  The arcsin transformation is calculated by taking $\phi =2 arcsin  \sqrt{P}$. The ES index is then calculated by taking taking the difference of the two transformations. This works because it produces effect sizes that do not depend on whether the proportions are in the middle of their ranges (.5) or not. 
+
+#5
+*a,b on paper*
+  Comparing the five years, we see that 1962 had the most occurances of rain. 1961 had the largest total rainfall of 13.197 inches, and the largest mean rainfall of 0.27 inches. 
+  We can see below that each year has a heavy right tail, with most rainfalls being smaller. With the few number of observations, there are many bumps in the distributions.I have also displayed a distribution of all the years combined. 
+```{r}
+rain_60 <- read.delim("ill-60.txt",header = FALSE)
+rain_61 <- read.delim("ill-61.txt",header = FALSE)
+rain_62 <- read.delim("ill-62.txt",header = FALSE)
+rain_63 <- read.delim("ill-63.txt",header = FALSE)
+rain_64 <- read.delim("ill-64.txt",header = FALSE)
+
+total_rain <- rbind(rain_60,rain_61,rain_62,rain_63,rain_64)
+
+grid.arrange(
+  ggplot(rain_60)+geom_density(aes(V1)),
+  ggplot(rain_61)+geom_density(aes(V1)),
+  ggplot(rain_62)+geom_density(aes(V1)),
+  ggplot(rain_63)+geom_density(aes(V1)),
+  ggplot(rain_64)+geom_density(aes(V1)),
+  ggplot(total_rain)+geom_density(aes(V1))+labs(title = "Total"),
+  nrow = 2
+)
+
+```
+  The distribution of the total rainfall is clearly non-normal. Based on our "descdist" plot of kurtosis and skewness, it doesn't appear to be too close to the gamma distribution either. I believe it could be closer to an f or beta distribution. 
+  
+```{r}
+descdist(total_rain$V1)
+
+```
+  
+
+#6
+*On Paper*
+  
